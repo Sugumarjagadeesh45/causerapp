@@ -8357,6 +8357,7 @@ const handleRideAccepted = (data: any) => {
 
 const styles = StyleSheet.create({
 
+  
 
     logoWatermarkContainer: {
     position: 'absolute',
