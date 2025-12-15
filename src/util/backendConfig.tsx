@@ -1,5 +1,5 @@
+export const API_BASE_URL = "https://eb4a6949d46b.ngrok-free.app";
 
-export const API_BASE_URL = "https://ba-lhhs.onrender.com";
 
 // ----------- MAIN URL FUNCTIONS -------------- //
 
@@ -11,8 +11,7 @@ export const getSocketUrl = (): string => {
   return getBackendUrl();
 };
 
-// ----------- IMAGE URL HANDLERS -------------- //
-
+// ----------- IMAGE URL HANDLERS -------------- ///
 // Main image URL handler
 export const getImageUrl = (imagePath: string): string => {
   if (!imagePath) return "";

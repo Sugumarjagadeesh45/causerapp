@@ -5230,121 +5230,134 @@ const TaxiContent: React.FC<TaxiContentProps> = ({
     let lastUpdateTime = 0;
     const UPDATE_THROTTLE = 1000;
 
-    const handleDriverLiveLocationUpdate = async (data: any) => {
-      if (!componentMounted || !isMountedRef.current) return;
+    
+
+    // In the driverLiveLocationUpdate useEffect (around line 631):
+const handleDriverLiveLocationUpdate = async (data: any) => {
+  if (!componentMounted || !isMountedRef.current) return;
+  
+  const now = Date.now();
+  if (now - lastUpdateTime < UPDATE_THROTTLE) return;
+  lastUpdateTime = now;
+
+  // ✅ ALWAYS LOG DRIVER LOCATION TO CONSOLE
+  console.log('🚗 DRIVER LIVE LOCATION UPDATE:', {
+    driverId: data.driverId,
+    latitude: data.lat,
+    longitude: data.lng,
+    heading: data.heading || 0,
+    timestamp: new Date().toISOString(),
+    speed: data.speed || 'N/A'
+  });
+
+  // Validate data freshness
+  if (data.timestamp) {
+    const dataAge = now - data.timestamp;
+    if (dataAge > 10000) return;
+  }
+
+  if (!currentRideIdRef.current && (rideStatusRef.current === "completed" || rideStatusRef.current === "ended")) {
+    return;
+  }
+
+  if (currentRideIdRef.current) {
+    if (!acceptedDriverRef.current || data.driverId !== acceptedDriverRef.current.driverId) {
+      console.log('⚠️ Ignoring location from non-accepted driver:', data.driverId);
+      return;
+    }
+  }
+
+  // ✅ FIX: Check if function exists before calling it
+  if (handleDriverLocationUpdateWithAnimations) {
+    // Use enhanced animation handler for continuous smooth animation
+    await handleDriverLocationUpdateWithAnimations(data);
+  } else {
+    // Fallback to basic location update
+    console.warn('⚠️ handleDriverLocationUpdateWithAnimations not available, using fallback');
+    setDriverLocation({ latitude: data.lat, longitude: data.lng });
+    setDisplayedDriverLocation({ latitude: data.lat, longitude: data.lng });
+  }
+
+  // Save to AsyncStorage
+  await AsyncStorage.setItem('driverLocation', JSON.stringify({ latitude: data.lat, longitude: data.lng }));
+  await AsyncStorage.setItem('driverLocationTimestamp', Date.now().toString());
+
+  // Update nearby drivers - FIXED: Only update if not in active ride to prevent unwanted markers
+  if (!currentRideIdRef.current || !acceptedDriverRef.current) {
+    setNearbyDrivers((prev) => {
+      if (!componentMounted || !isMountedRef.current) return prev;
+      const driverIndex = prev.findIndex(d => d.driverId === data.driverId);
+      if (driverIndex !== -1) {
+        const updatedDrivers = [...prev];
+        updatedDrivers[driverIndex] = {
+          ...updatedDrivers[driverIndex],
+          location: { coordinates: [data.lng, data.lat] },
+          status: data.status || updatedDrivers[driverIndex].status,
+          vehicleType: selectedRideTypeRef.current,
+          _lastUpdate: Date.now(),
+        };
+        return updatedDrivers;
+      }
+      return prev;
+    });
+  }
+
+  // Check arrival conditions
+  if (bookedPickupLocationRef.current && rideStatusRef.current === "onTheWay" && acceptedDriverRef.current && data.driverId === acceptedDriverRef.current.driverId) {
+    const distanceToPickup = calculateDistanceInMeters(
+      data.lat,
+      data.lng,
+      bookedPickupLocationRef.current.latitude,
+      bookedPickupLocationRef.current.longitude
+    );
+    
+    console.log(`📍 Driver distance to pickup: ${distanceToPickup.toFixed(1)} meters`);
+    
+    if (distanceToPickup <= 50 && !driverArrivedAlertShownRef.current) {
+      console.log('🚨 DRIVER ARRIVED AT PICKUP LOCATION');
+      setRideStatus("arrived");
+      setDriverArrivedAlertShown(true);
+      setShowOTPInput(true);
       
-      const now = Date.now();
-      if (now - lastUpdateTime < UPDATE_THROTTLE) return;
-      lastUpdateTime = now;
+      // Trigger bounce animation
+      Animated.sequence([
+        Animated.timing(pulseAnimation, {
+          toValue: 1.5,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnimation, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }
 
-      // ✅ ALWAYS LOG DRIVER LOCATION TO CONSOLE
-      console.log('🚗 DRIVER LIVE LOCATION UPDATE:', {
+  if (dropoffLocationRef.current && rideStatusRef.current === "started" && acceptedDriverRef.current && data.driverId === acceptedDriverRef.current.driverId) {
+    const distanceToDropoff = calculateDistanceInMeters(
+      data.lat,
+      data.lng,
+      dropoffLocationRef.current.latitude,
+      dropoffLocationRef.current.longitude
+    );
+   
+    console.log(`📍 Driver distance to dropoff: ${distanceToDropoff.toFixed(1)} meters`);
+   
+    if (distanceToDropoff <= 50 && !rideCompletedAlertShownRef.current) {
+      console.log('🎯 DRIVER REACHED DESTINATION');
+      socket.emit("driverReachedDestination", {
+        rideId: currentRideIdRef.current,
         driverId: data.driverId,
-        latitude: data.lat,
-        longitude: data.lng,
-        heading: data.heading || 0,
-        timestamp: new Date().toISOString(),
-        speed: data.speed || 'N/A'
+        distance: travelledKmRef.current.toFixed(2),
       });
+      setRideCompletedAlertShown(true);
+    }
+  }
+};
 
-      // Validate data freshness
-      if (data.timestamp) {
-        const dataAge = now - data.timestamp;
-        if (dataAge > 10000) return;
-      }
 
-      if (!currentRideIdRef.current && (rideStatusRef.current === "completed" || rideStatusRef.current === "ended")) {
-        return;
-      }
-
-      if (currentRideIdRef.current) {
-        if (!acceptedDriverRef.current || data.driverId !== acceptedDriverRef.current.driverId) {
-          console.log('⚠️ Ignoring location from non-accepted driver:', data.driverId);
-          return;
-        }
-      }
-
-      // Use enhanced animation handler for continuous smooth animation
-      await handleDriverLocationUpdateWithAnimations(data);
-
-      // Save to AsyncStorage
-      await AsyncStorage.setItem('driverLocation', JSON.stringify({ latitude: data.lat, longitude: data.lng }));
-      await AsyncStorage.setItem('driverLocationTimestamp', Date.now().toString());
-
-      // Update nearby drivers - FIXED: Only update if not in active ride to prevent unwanted markers
-      if (!currentRideIdRef.current || !acceptedDriverRef.current) {
-        setNearbyDrivers((prev) => {
-          if (!componentMounted || !isMountedRef.current) return prev;
-          const driverIndex = prev.findIndex(d => d.driverId === data.driverId);
-          if (driverIndex !== -1) {
-            const updatedDrivers = [...prev];
-            updatedDrivers[driverIndex] = {
-              ...updatedDrivers[driverIndex],
-              location: { coordinates: [data.lng, data.lat] },
-              status: data.status || updatedDrivers[driverIndex].status,
-              vehicleType: selectedRideTypeRef.current,
-              _lastUpdate: Date.now(),
-            };
-            return updatedDrivers;
-          }
-          return prev;
-        });
-      }
-
-      // Check arrival conditions
-      if (bookedPickupLocationRef.current && rideStatusRef.current === "onTheWay" && acceptedDriverRef.current && data.driverId === acceptedDriverRef.current.driverId) {
-        const distanceToPickup = calculateDistanceInMeters(
-          data.lat,
-          data.lng,
-          bookedPickupLocationRef.current.latitude,
-          bookedPickupLocationRef.current.longitude
-        );
-        
-        console.log(`📍 Driver distance to pickup: ${distanceToPickup.toFixed(1)} meters`);
-        
-        if (distanceToPickup <= 50 && !driverArrivedAlertShownRef.current) {
-          console.log('🚨 DRIVER ARRIVED AT PICKUP LOCATION');
-          setRideStatus("arrived");
-          setDriverArrivedAlertShown(true);
-          setShowOTPInput(true);
-          
-          // Trigger bounce animation
-          Animated.sequence([
-            Animated.timing(pulseAnimation, {
-              toValue: 1.5,
-              duration: 300,
-              useNativeDriver: true,
-            }),
-            Animated.timing(pulseAnimation, {
-              toValue: 1,
-              duration: 300,
-              useNativeDriver: true,
-            }),
-          ]).start();
-        }
-      }
-
-      if (dropoffLocationRef.current && rideStatusRef.current === "started" && acceptedDriverRef.current && data.driverId === acceptedDriverRef.current.driverId) {
-        const distanceToDropoff = calculateDistanceInMeters(
-          data.lat,
-          data.lng,
-          dropoffLocationRef.current.latitude,
-          dropoffLocationRef.current.longitude
-        );
-       
-        console.log(`📍 Driver distance to dropoff: ${distanceToDropoff.toFixed(1)} meters`);
-       
-        if (distanceToDropoff <= 50 && !rideCompletedAlertShownRef.current) {
-          console.log('🎯 DRIVER REACHED DESTINATION');
-          socket.emit("driverReachedDestination", {
-            rideId: currentRideIdRef.current,
-            driverId: data.driverId,
-            distance: travelledKmRef.current.toFixed(2),
-          });
-          setRideCompletedAlertShown(true);
-        }
-      }
-    };
 
     socket.on("driverLiveLocationUpdate", handleDriverLiveLocationUpdate);
     return () => {
@@ -5352,6 +5365,185 @@ const TaxiContent: React.FC<TaxiContentProps> = ({
       socket.off("driverLiveLocationUpdate", handleDriverLiveLocationUpdate);
     };
   }, [handleDriverLocationUpdateWithAnimations, pulseAnimation]);
+
+
+
+
+  // FIXED: Enhanced ride completion handler
+const handleRideCompleted = useCallback(async (data: any) => {
+  console.log("🎉 [handleRideCompleted] Event received:", data);
+  
+  try {
+    if (!isMountedRef.current) return;
+    
+    // Validate data
+    if (!data || !data.rideId) {
+      console.error('❌ Invalid ride completion data');
+      return;
+    }
+    
+    console.log('📊 Ride completion data:', {
+      rideId: data.rideId,
+      distance: data.distance,
+      charge: data.charge,
+      currentRideId: currentRideIdRef.current
+    });
+    
+    // Check if this is our current ride
+    if (data.rideId !== currentRideIdRef.current) {
+      console.log(`⚠️ Ignoring ride completion for different ride: ${data.rideId}`);
+      return;
+    }
+    
+    // Update state immediately
+    setRideStatus("completed");
+    setRealTimeNavigationActive(false);
+    setShowOTPInput(false);
+    setHidePickupAndUserLocation(false);
+    setFollowDriver(false);
+    setOtpVerifiedAlertShown(false);
+    
+    // Calculate final bill
+    const finalDistance = parseFloat(data?.distance) || travelledKmRef.current || 0;
+    const finalTime = data?.travelTime || travelTime || "0 min";
+    let finalCharge = data?.charge || 0;
+    
+    // If no charge provided, calculate it
+    if (finalCharge === 0 && finalDistance > 0) {
+      const pricePerKm = dynamicPrices[selectedRideTypeRef.current] || 15;
+      finalCharge = Math.round(finalDistance * pricePerKm);
+    }
+    
+    console.log(`💰 Bill calculation: ${finalDistance}km × ₹${dynamicPrices[selectedRideTypeRef.current]}/km = ₹${finalCharge}`);
+    
+    // Set bill details
+    const newBillDetails = {
+      distance: `${finalDistance.toFixed(2)} km`,
+      travelTime: finalTime,
+      charge: finalCharge,
+      driverName: data?.driverName || acceptedDriverRef.current?.name || "Driver",
+      vehicleType: data?.vehicleType || acceptedDriverRef.current?.vehicleType || selectedRideTypeRef.current,
+    };
+    
+    setBillDetails(newBillDetails);
+    
+    // Show bill modal
+    setTimeout(() => {
+      if (isMountedRef.current) {
+        setShowBillModal(true);
+        console.log('💰 Bill modal shown');
+      }
+    }, 500);
+    
+    // Clear all ride data after showing bill
+    const clearRideData = () => {
+      if (!isMountedRef.current) return;
+      
+      console.log('🧹 Clearing all ride data');
+      
+      // Clear all state
+      setRouteCoords([]);
+      setDriverLocation(null);
+      setDisplayedDriverLocation(null);
+      setPickupLocation(null);
+      setDropoffLocation(null);
+      setBookedPickupLocation(null);
+      setDistance('');
+      setTravelTime('');
+      setEstimatedPrice(null);
+      setAcceptedDriver(null);
+      setDriverId(null);
+      setDriverName(null);
+      setDriverMobile(null);
+      setTravelledKm(0);
+      setLastCoord(null);
+      setNearbyDrivers([]);
+      setNearbyDriversCount(0);
+      setApiError(null);
+      setLastPolylineUpdateLocation(null);
+      setSmoothRouteCoords([]);
+      
+      // Reset input fields
+      propHandlePickupChange('');
+      propHandleDropoffChange('');
+      
+      // Reset UI
+      setShowPickupSuggestions(false);
+      setShowDropoffSuggestions(false);
+      setShowSearchingPopup(false);
+      setHasClosedSearching(false);
+      
+      // Force map refresh
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          setMapKey(prevKey => prevKey + 1);
+          console.log('🗺️ Map refreshed');
+        }
+      }, 100);
+      
+      // Clear AsyncStorage
+      AsyncStorage.multiRemove([
+        'currentRideId',
+        'acceptedDriver',
+        'rideStatus',
+        'bookingOTP',
+        'driverLocation',
+        'driverLocationTimestamp',
+        'ridePickupLocation',
+        'bookedPickupLocation',
+        'rideDropoffLocation',
+        'rideRouteCoords',
+        'rideDistance',
+        'rideTravelTime'
+      ]).then(() => {
+        console.log('✅ AsyncStorage cleared');
+      });
+    };
+    
+    // Clear after showing bill for 5 seconds
+    setTimeout(clearRideData, 5000);
+    
+    console.log('✅ Ride completion handled successfully');
+    
+  } catch (error) {
+    console.error('❌ Error in handleRideCompleted:', error);
+    
+    // Emergency reset on error
+    Alert.alert(
+      "Ride Completed",
+      "Your ride has been completed. You can now book a new ride.",
+      [{ text: "OK", onPress: resetToHomeScreen }]
+    );
+  }
+}, []); // Empty deps because we use refs
+
+
+
+// Set up the event listener
+useEffect(() => {
+  if (!isMountedRef.current || !socket) return;
+
+  console.log("🔌 Setting up ride completion event listeners");
+
+  socket.on("rideCompleted", handleRideCompleted);
+  socket.on("rideCompletionConfirmed", handleRideCompleted);
+  socket.on("rideCompletedGlobal", handleRideCompleted);
+  
+  return () => {
+    socket.off("rideCompleted", handleRideCompleted);
+    socket.off("rideCompletionConfirmed", handleRideCompleted);
+    socket.off("rideCompletedGlobal", handleRideCompleted);
+  };
+}, [handleRideCompleted]); // Stable because of useCallback with empty deps
+
+
+
+// Add this helper function in socket.js
+function calculateTravelTime(startDate, endDate) {
+  const diffMs = endDate - startDate;
+  const diffMins = Math.round(diffMs / 60000);
+  return `${diffMins} mins`;
+}
 
   // Add a dedicated driver location request function
   const requestDriverLocation = useCallback((rideId: string, driverId: string) => {
@@ -5730,59 +5922,263 @@ const TaxiContent: React.FC<TaxiContentProps> = ({
 
   
 
-
-  // In user app's socket event handling
+  
+  // Add this comprehensive socket event handler setup in TaxiContent.tsx
 useEffect(() => {
-  if (socket) {
-    socket.on("otpVerified", (data) => {
-      console.log('✅ OTP Verified by driver:', data);
-      
-      // Show professional OTP verified alert
-      Alert.alert(
-        "✅ OTP Verified Successfully!",
-        "Your ride is now starting. Driver is on the way to your destination.",
-        [
-          {
-            text: "OK",
-            onPress: () => {
-              console.log("OTP verification acknowledged");
-              // Start navigation updates
-              setRealTimeNavigationActive(true);
-              setShowLocationOverlay(false);
-              
-              // Request driver location updates
-              if (acceptedDriver && socket) {
-                socket.emit('requestDriverLocation', {
-                  rideId: currentRideId,
-                  driverId: acceptedDriver.driverId,
-                  priority: 'high'
-                });
-              }
-            }
+  if (!socket) return;
+
+  console.log('🔧 Setting up comprehensive socket event listeners');
+
+  // ✅ OTP Verification Events
+  socket.on("otpVerified", (data) => {
+    console.log('✅ OTP Verified event received:', data);
+    if (data.rideId === currentRideId) {
+      handleOtpVerification(data);
+    }
+  });
+
+  socket.on("rideOTPVerified", (data) => {
+    console.log('🔐 Ride OTP Verified event:', data);
+    if (data.rideId === currentRideId) {
+      handleOtpVerification(data);
+    }
+  });
+
+  // ✅ Ride Start Events
+  socket.on("driverStartedRide", (data) => {
+    console.log('🚀 Driver started ride event:', data);
+    if (data.rideId === currentRideId) {
+      handleOtpVerification(data);
+    }
+  });
+
+  // ✅ Ride Completion Events
+  socket.on("rideCompleted", (data) => {
+    console.log('🎉 Ride completed event received:', data);
+    handleRideCompletion(data);
+  });
+
+  socket.on("rideCompletionConfirmed", (data) => {
+    console.log('✅ Ride completion confirmed:', data);
+    handleRideCompletion(data);
+  });
+
+  socket.on("rideCompletedGlobal", (data) => {
+    console.log('🌍 Ride completed global event:', data);
+    if (data.targetUserId === userId) {
+      handleRideCompletion(data);
+    }
+  });
+
+  // ✅ Ride Status Updates
+  socket.on("rideStatusUpdate", (data) => {
+    console.log('📋 Ride status update:', data);
+    if (data.rideId === currentRideId) {
+      if (data.status === "started" && data.otpVerified) {
+        handleOtpVerification(data);
+      } else if (data.status === "completed") {
+        handleRideCompletion(data);
+      }
+    }
+  });
+
+  // ✅ Debug: Listen to all events
+  socket.onAny((eventName, ...args) => {
+    if (eventName.includes('otp') || eventName.includes('complete') || 
+        eventName.includes('started') || eventName.includes('status')) {
+      console.log(`🔍 [ALL EVENTS] ${eventName}:`, args);
+    }
+  });
+
+  return () => {
+    // Clean up all listeners
+    socket.off("otpVerified");
+    socket.off("rideOTPVerified");
+    socket.off("driverStartedRide");
+    socket.off("rideCompleted");
+    socket.off("rideCompletionConfirmed");
+    socket.off("rideCompletedGlobal");
+    socket.off("rideStatusUpdate");
+    socket.offAny();
+  };
+}, [currentRideId]);
+
+// Add these handler functions
+const handleOtpVerification = (data: any) => {
+  console.log('🎯 Handling OTP verification:', data);
+  
+  Alert.alert(
+    "✅ OTP Verified Successfully!",
+    "Your ride is now starting. Driver is on the way to your destination.",
+    [
+      {
+        text: "OK",
+        onPress: () => {
+          console.log("OTP verification acknowledged");
+          setRideStatus("started");
+          setRealTimeNavigationActive(true);
+          setShowOTPInput(false);
+          setShowLocationOverlay(false);
+          setFollowDriver(true);
+          
+          // Request driver location updates
+          if (acceptedDriver && socket) {
+            socket.emit('requestDriverLocation', {
+              rideId: currentRideId,
+              driverId: acceptedDriver.driverId,
+              priority: 'high'
+            });
           }
-        ],
-        { 
-          cancelable: false,
-          onDismiss: () => console.log("OTP alert dismissed")
         }
-      );
-      
-      // Update ride status
-      setRideStatus("started");
-      setRealTimeNavigationActive(true);
-      setShowLocationOverlay(false);
-      
-      console.log('🎯 REAL-TIME NAVIGATION ACTIVATED AFTER OTP');
+      }
+    ],
+    { cancelable: false }
+  );
+};
+
+
+
+
+
+const handleRideCompletion = useCallback(async (data: any) => {
+  try {
+    console.log("🎉 HANDLE RIDE COMPLETION TRIGGERED");
+    console.log("📦 Completion data:", data);
+    
+    if (data.rideId !== currentRideId) {
+      console.log(`⚠️ Ride ID mismatch: ${data.rideId} vs ${currentRideId}`);
+      return;
+    }
+    
+    // Update state first
+    setRideStatus("completed");
+    setRealTimeNavigationActive(false);
+    setShowOTPInput(false);
+    setHidePickupAndUserLocation(false);
+    setOtpVerifiedAlertShown(false);
+    setFollowDriver(false);
+    
+    // Calculate final charge
+    const finalDistance = data?.distance || travelledKm || 0;
+    const finalTime = data?.travelTime || travelTime || "0 min";
+    let finalCharge = data?.charge || 0;
+    
+    if (finalCharge === 0 && finalDistance > 0) {
+      finalCharge = finalDistance * (dynamicPrices[selectedRideType] || 0);
+    }
+    
+    console.log(`💰 Final bill: ${finalDistance}km × ₹${dynamicPrices[selectedRideType]}/km = ₹${finalCharge}`);
+    
+    // Set bill details
+    setBillDetails({
+      distance: `${parseFloat(finalDistance).toFixed(2)} km`,
+      travelTime: finalTime,
+      charge: finalCharge,
+      driverName: data?.driverName || acceptedDriver?.name || "Driver",
+      vehicleType: data?.vehicleType || acceptedDriver?.vehicleType || selectedRideType,
     });
     
-    return () => {
-      socket.off("otpVerified");
-    };
+    // Show bill modal immediately
+    setShowBillModal(true);
+    console.log('💰 Bill modal shown immediately');
+    
+    // Clear all visual ride data
+    console.log('🧹 Clearing all visual ride data');
+    setRouteCoords([]);
+    setDriverLocation(null);
+    setDisplayedDriverLocation(null);
+    setPickupLocation(null);
+    setDropoffLocation(null);
+    setBookedPickupLocation(null);
+    setDistance('');
+    setTravelTime('');
+    setEstimatedPrice(null);
+    setAcceptedDriver(null);
+    setDriverId(null);
+    setDriverName(null);
+    setDriverMobile(null);
+    setTravelledKm(0);
+    setLastCoord(null);
+    setNearbyDrivers([]);
+    setNearbyDriversCount(0);
+    setApiError(null);
+    setLastPolylineUpdateLocation(null);
+    setSmoothRouteCoords([]);
+    
+    // Reset UI state
+    propHandlePickupChange('');
+    propHandleDropoffChange('');
+    setShowPickupSuggestions(false);
+    setShowDropoffSuggestions(false);
+    setShowSearchingPopup(false);
+    setHasClosedSearching(false);
+    
+    // Force map remount to clear all markers and routes
+    setMapKey(prevKey => prevKey + 1);
+    console.log('🗺️ Map remounted to clear visual elements');
+    
+    // Clear AsyncStorage for ride data
+    await AsyncStorage.multiRemove([
+      'currentRideId',
+      'acceptedDriver',
+      'rideStatus',
+      'bookingOTP',
+      'driverLocation',
+      'driverLocationTimestamp',
+      'ridePickupLocation',
+      'bookedPickupLocation',
+      'rideDropoffLocation',
+      'rideRouteCoords',
+      'rideDistance',
+      'rideTravelTime'
+    ]);
+    
+    console.log('✅ Ride completion handled successfully');
+    
+  } catch (error) {
+    console.error('❌ Error in handleRideCompletion:', error);
+    // Even if there's an error, at least reset the state
+    Alert.alert(
+      "Ride Completed",
+      "Your ride has been completed. Please book a new ride.",
+      [{ text: "OK", onPress: () => resetToHomeScreen() }]
+    );
   }
-}, [currentRideId, acceptedDriver]);
+}, [currentRideId, travelledKm, travelTime, acceptedDriver, selectedRideType, dynamicPrices]);
 
 
 
+const resetToHomeScreen = useCallback(async () => {
+  console.log('🔄 Resetting to home screen');
+  
+  setCurrentRideId(null);
+  setRideStatus("idle");
+  setRealTimeNavigationActive(false);
+  setShowLocationOverlay(true);
+  setFollowDriver(false);
+  setAcceptedDriver(null);
+  setDriverLocation(null);
+  setDisplayedDriverLocation(null);
+  setRouteCoords([]);
+  setShowBillModal(false);
+  setShowOTPInput(false);
+  
+  propHandlePickupChange('');
+  propHandleDropoffChange('');
+  
+  // Force map refresh
+  setMapKey(prev => prev + 1);
+  
+  // Clear storage
+  await AsyncStorage.multiRemove([
+    'currentRideId',
+    'acceptedDriver',
+    'rideStatus',
+    'bookingOTP'
+  ]);
+  
+  console.log('✅ Home screen reset complete');
+}, []);
 
   // Driver arrival polling
   useEffect(() => {
@@ -5815,82 +6211,27 @@ useEffect(() => {
     };
   }, [rideStatus, bookedPickupLocation, driverLocation, driverArrivedAlertShown, acceptedDriver]);
   
-  // ENHANCED: Ride completed handler with immediate map cleanup
-  useEffect(() => {
-    if (!isMountedRef.current) return;
-    
-    const handleRideCompleted = async (data: any) => {
-      try {
-        console.log("🎉 Ride completed event received - Showing bill immediately");
-        setRideStatus("completed");
-        setRealTimeNavigationActive(false);
-        setShowOTPInput(false);
-        setHidePickupAndUserLocation(false);
-        setOtpVerifiedAlertShown(false);
-        setFollowDriver(false);
-        
-        const finalDistance = data?.distance || travelledKm || 0;
-        const finalTime = data?.travelTime || travelTime || "0 min";
-        let finalCharge = data?.charge || finalDistance * (dynamicPrices[selectedRideType] || 0);
-        if (finalDistance === 0) finalCharge = 0;
-        
-        setBillDetails({
-          distance: `${finalDistance.toFixed(2)} km`,
-          travelTime: finalTime,
-          charge: finalCharge,
-          driverName: acceptedDriver?.name || "Driver",
-          vehicleType: acceptedDriver?.vehicleType || selectedRideType,
-        });
-        
-        setShowBillModal(true);
-        console.log('💰 Bill modal shown automatically');
 
-        // CRITICAL: Clear all ride-related visual data immediately
-        console.log('🧹 Clearing all visual ride data from map');
-        setRouteCoords([]);
-        setDriverLocation(null);
-        setDisplayedDriverLocation(null);
-        setPickupLocation(null);
-        setDropoffLocation(null);
-        setBookedPickupLocation(null);
-        setDistance('');
-        setTravelTime('');
-        setEstimatedPrice(null);
-        setAcceptedDriver(null);
-        setDriverId(null);
-        setDriverName(null);
-        setDriverMobile(null);
-        setTravelledKm(0);
-        setLastCoord(null);
-        setNearbyDrivers([]);
-        setNearbyDriversCount(0);
-        setApiError(null);
-        setLastPolylineUpdateLocation(null);
-        setSmoothRouteCoords([]);
-        
-        // Force map remount to clear all markers and routes
-        setMapKey(prevKey => prevKey + 1);
-        
-        // Clear AsyncStorage for visual elements
-        await AsyncStorage.multiRemove([
-          'rideRouteCoords',
-          'driverLocation',
-          'driverLocationTimestamp',
-          'ridePickupLocation',
-          'rideDropoffLocation',
-          'bookedPickupLocation'
-        ]);
-      } catch (error) {
-        console.error('❌ Error in handleRideCompleted:', error);
-      }
-    };
-    
-    socket.on("rideCompleted", handleRideCompleted);
-    return () => {
-      socket.off("rideCompleted", handleRideCompleted);
-    };
-  }, [travelledKm, travelTime, acceptedDriver, selectedRideType, dynamicPrices]);
-  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   // Ride status update handler
   useEffect(() => {
     if (!isMountedRef.current) return;
@@ -6284,10 +6625,40 @@ useEffect(() => {
   
 
 
-  // Add this in the user app socket event handlers
-useEffect(() => {
-  if (!isMountedRef.current) return;
   
+
+  // Add this useEffect to properly set up ride completion event listeners
+useEffect(() => {
+  if (!socket || !isMountedRef.current) return;
+
+  console.log('🔧 Setting up ride completion event listeners');
+
+  // Handle ride completion events
+  const handleRideCompleted = (data: any) => {
+    console.log("🎉 Ride completed event received:", data);
+    handleRideCompletion(data);
+  };
+
+  // Listen for all completion events
+  socket.on("rideCompleted", handleRideCompleted);
+  socket.on("rideCompletionConfirmed", handleRideCompleted);
+  socket.on("rideCompletedGlobal", handleRideCompleted);
+
+  return () => {
+    socket.off("rideCompleted", handleRideCompleted);
+    socket.off("rideCompletionConfirmed", handleRideCompleted);
+    socket.off("rideCompletedGlobal", handleRideCompleted);
+  };
+}, [handleRideCompletion]); // Include the function in dependencies
+
+
+
+
+  // Add these socket event handlers in your useEffect section (around line 650-750)
+useEffect(() => {
+  if (!isMountedRef.current || !socket) return;
+
+  // ✅ OTP Verified Handler
   const handleOtpVerified = (data: any) => {
     console.log('✅ OTP Verified event received:', data);
     
@@ -6304,6 +6675,8 @@ useEffect(() => {
               // Start navigation updates
               setRealTimeNavigationActive(true);
               setShowLocationOverlay(false);
+              setRideStatus("started");
+              setShowOTPInput(false);
               
               // Request driver location updates
               if (acceptedDriver && socket) {
@@ -6322,25 +6695,70 @@ useEffect(() => {
         }
       );
       
-      // Update ride status
-      setRideStatus("started");
-      setRealTimeNavigationActive(true);
-      setShowLocationOverlay(false);
-      setShowOTPInput(false);
-      
       console.log('🎯 REAL-TIME NAVIGATION ACTIVATED AFTER OTP');
     }
   };
+
+  // ✅ Ride Status Update Handler
+  const handleRideStatusUpdate = (data: any) => {
+    console.log('📋 Ride status update received:', data);
+    
+    if (data.rideId === currentRideId) {
+      if (data.status === "started") {
+        console.log('🚀 Ride started event received');
+        setRideStatus("started");
+        setRealTimeNavigationActive(true);
+        setShowOTPInput(false);
+        
+        // Also trigger OTP verified UI
+        Alert.alert(
+          "✅ Ride Started!",
+          "Driver has started the ride to your destination.",
+          [{ text: "OK" }],
+          { cancelable: false }
+        );
+      }
+    }
+  };
+
+  // ✅ Driver Started Ride Handler
+  const handleDriverStartedRide = (data: any) => {
+    console.log('🚀 Driver started ride event:', data);
+    
+    if (data.rideId === currentRideId) {
+      setRideStatus("started");
+      setRealTimeNavigationActive(true);
+      setShowOTPInput(false);
+      
+      Alert.alert(
+        "✅ Ride Started!",
+        "Driver has started the ride to your destination.",
+        [{ text: "OK" }],
+        { cancelable: false }
+      );
+    }
+  };
+
+
   
-  // Listen for OTP verified events
+  
+
+  // Listen for all these events
   socket.on("otpVerified", handleOtpVerified);
-  socket.on("otpVerifiedAlert", handleOtpVerified); // Also listen for alert-specific event
+  socket.on("rideStatusUpdate", handleRideStatusUpdate);
+  socket.on("driverStartedRide", handleDriverStartedRide);
+  socket.on("rideCompleted", handleRideCompleted);
+  socket.on("rideCompletedGlobal", handleRideCompleted); // Also listen for global event
   
   return () => {
     socket.off("otpVerified", handleOtpVerified);
-    socket.off("otpVerifiedAlert", handleOtpVerified);
+    socket.off("rideStatusUpdate", handleRideStatusUpdate);
+    socket.off("driverStartedRide", handleDriverStartedRide);
+    socket.off("rideCompleted", handleRideCompleted);
+    socket.off("rideCompletedGlobal", handleRideCompleted);
   };
-}, [currentRideId, acceptedDriver]);
+}, [currentRideId, acceptedDriver, travelledKm, travelTime, selectedRideType, dynamicPrices]);
+
 
 
 
@@ -7637,27 +8055,22 @@ const isValidLatLng = (lat: number | undefined, lng: number | undefined): boolea
 
   
 
+
   const handleBillModalClose = async () => {
-  console.log('💰 Closing bill modal and resetting to home screen');
+  console.log('💰 Closing bill modal and completely resetting app');
   
   // Close modal first
   setShowBillModal(false);
   
-  // Reset all state to initial values
+  // Clear all ride state
+  setCurrentRideId(null);
   setRideStatus("idle");
   setRealTimeNavigationActive(false);
   setShowLocationOverlay(true);
   setFollowDriver(false);
-  
-  // Clear ride-specific data
-  setCurrentRideId(null);
   setAcceptedDriver(null);
-  setDriverId(null);
-  setDriverName(null);
-  setDriverMobile(null);
-  setPickupLocation(null);
-  setDropoffLocation(null);
-  setBookedPickupLocation(null);
+  setDriverLocation(null);
+  setDisplayedDriverLocation(null);
   setRouteCoords([]);
   setTravelledKm(0);
   setDistance('');
@@ -7668,34 +8081,32 @@ const isValidLatLng = (lat: number | undefined, lng: number | undefined): boolea
   setHidePickupAndUserLocation(false);
   setOtpVerifiedAlertShown(false);
   
-  // Clear input fields using the prop functions
+  // Reset input fields
   propHandlePickupChange('');
   propHandleDropoffChange('');
   
-  // Reset pickup/dropoff suggestions
-  setPickupSuggestions([]);
-  setDropoffSuggestions([]);
-  setShowPickupSuggestions(false);
-  setShowDropoffSuggestions(false);
+  // Clear driver markers
+  setNearbyDrivers([]);
+  setNearbyDriversCount(0);
+  
+  // Clear route data
+  setLastPolylineUpdateLocation(null);
+  setSmoothRouteCoords([]);
   
   // Reset search UI
   setShowSearchingPopup(false);
   setHasClosedSearching(false);
   
-  // Clear driver location data
-  setDriverLocation(null);
-  setDisplayedDriverLocation(null);
-  setLastPolylineUpdateLocation(null);
+  // Reset suggestions
+  setPickupSuggestions([]);
+  setDropoffSuggestions([]);
+  setShowPickupSuggestions(false);
+  setShowDropoffSuggestions(false);
   
-  // Clear route data
-  setSmoothRouteCoords([]);
+  // Force map refresh
+  setMapKey(prev => prev + 1);
   
-  // Keep user location and nearby drivers - fetch fresh
-  if (location) {
-    fetchNearbyDrivers(location.latitude, location.longitude);
-  }
-  
-  // Clear AsyncStorage for ride data only (keep user session)
+  // Clear AsyncStorage for ride data
   await AsyncStorage.multiRemove([
     'currentRideId',
     'acceptedDriver',
@@ -7714,21 +8125,59 @@ const isValidLatLng = (lat: number | undefined, lng: number | undefined): boolea
     'lastRideId'
   ]);
   
-  // Force map refresh
-  setMapKey(prev => prev + 1);
-  
-  // Show completion message
-  Alert.alert(
-    "Ride Completed ✅",
-    "Thank you for choosing EAZY GO! You can now book a new ride.",
-    [{ text: "OK" }]
-  );
+  // Fetch fresh nearby drivers
+  if (location) {
+    setTimeout(() => {
+      fetchNearbyDrivers(location.latitude, location.longitude);
+    }, 1000);
+  }
   
   console.log('✅ User app completely reset to home screen');
 };
 
 
+
+  // Add this useEffect to handle ALL completion events
+useEffect(() => {
+  if (!socket || !isMountedRef.current) return;
+
+  console.log('🔧 Setting up comprehensive ride completion listeners');
+
+  // Single handler for all completion events
+  const handleAllCompletions = (data: any) => {
+    console.log(`🎉 Ride completion event:`, {
+      event: 'rideCompleted',
+      data: data,
+      currentRideId: currentRideIdRef.current
+    });
+    
+    if (data.rideId === currentRideIdRef.current) {
+      handleRideCompleted(data);
+    }
+  };
+
+  // Listen for ALL completion events
+  socket.on("rideCompleted", handleAllCompletions);
+  socket.on("rideCompletionConfirmed", handleAllCompletions);
+  socket.on("rideCompletedGlobal", (data) => {
+    if (data.targetUserId === userId || data.rideId === currentRideIdRef.current) {
+      handleAllCompletions(data);
+    }
+  });
   
+  // Debug: log all events
+  socket.onAny((eventName, ...args) => {
+    if (eventName.includes('complete') || eventName.includes('ended') || eventName.includes('finished')) {
+      console.log(`🔍 [DEBUG] Socket event: ${eventName}`, args);
+    }
+  });
+
+  return () => {
+    socket.off("rideCompleted", handleAllCompletions);
+    socket.off("rideCompletionConfirmed", handleAllCompletions);
+    socket.off("rideCompletedGlobal", handleAllCompletions);
+  };
+}, [socket, handleRideCompleted]); // Add handleRideCompleted to deps
 
 
   // Debug monitoring for animation state
@@ -8237,6 +8686,9 @@ const isValidLatLng = (lat: number | undefined, lng: number | undefined): boolea
 };
 
 const styles = StyleSheet.create({
+
+
+  
 
   
 
