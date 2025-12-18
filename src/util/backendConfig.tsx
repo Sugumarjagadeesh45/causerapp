@@ -1,6 +1,10 @@
-export const API_BASE_URL = "https://eb4a6949d46b.ngrok-free.app";
+// Change from ngrok to your server IP
+export const API_BASE_URL = "https://5207a262405d.ngrok-free.app";
 
-
+// Add this function to get your server URL for map tiles
+export const getMapTileUrl = () => {
+  return "https://5207a262405d.ngrok-free.app/data/v3";
+};
 // ----------- MAIN URL FUNCTIONS -------------- //
 
 export const getBackendUrl = (): string => {
