@@ -863,155 +863,78 @@ const DRIVER_LOCATION_THROTTLE = 2000; // 2 seconds
 
 
 
-
-  // FIXED: Enhanced ride completion handler
-const handleRideCompleted = useCallback(async (data: any) => {
-  console.log("🎉 [handleRideCompleted] Event received:", data);
+// Replace your existing handleBillModalClose with this:
+const handleBillModalClose = async () => {
+  console.log('💰 Closing bill modal and completely resetting app');
   
-  try {
-    if (!isMountedRef.current) return;
-    
-    // Validate data
-    if (!data || !data.rideId) {
-      console.error('❌ Invalid ride completion data');
-      return;
-    }
-    
-    console.log('📊 Ride completion data:', {
-      rideId: data.rideId,
-      distance: data.distance,
-      charge: data.charge,
-      currentRideId: currentRideIdRef.current
-    });
-    
-    // Check if this is our current ride
-    if (data.rideId !== currentRideIdRef.current) {
-      console.log(`⚠️ Ignoring ride completion for different ride: ${data.rideId}`);
-      return;
-    }
-    
-    // Update state immediately
-    setRideStatus("completed");
-    setRealTimeNavigationActive(false);
-    setShowOTPInput(false);
-    setHidePickupAndUserLocation(false);
-    setFollowDriver(false);
-    setOtpVerifiedAlertShown(false);
-    
-    // Calculate final bill
-    const finalDistance = parseFloat(data?.distance) || travelledKmRef.current || 0;
-    const finalTime = data?.travelTime || travelTime || "0 min";
-    let finalCharge = data?.charge || 0;
-    
-    // If no charge provided, calculate it
-    if (finalCharge === 0 && finalDistance > 0) {
-      const pricePerKm = dynamicPrices[selectedRideTypeRef.current] || 15;
-      finalCharge = Math.round(finalDistance * pricePerKm);
-    }
-    
-    console.log(`💰 Bill calculation: ${finalDistance}km × ₹${dynamicPrices[selectedRideTypeRef.current]}/km = ₹${finalCharge}`);
-    
-    // Set bill details
-    const newBillDetails = {
-      distance: `${finalDistance.toFixed(2)} km`,
-      travelTime: finalTime,
-      charge: finalCharge,
-      driverName: data?.driverName || acceptedDriverRef.current?.name || "Driver",
-      vehicleType: data?.vehicleType || acceptedDriverRef.current?.vehicleType || selectedRideTypeRef.current,
-    };
-    
-    setBillDetails(newBillDetails);
-    
-    // Show bill modal
-    setTimeout(() => {
-      if (isMountedRef.current) {
-        setShowBillModal(true);
-        console.log('💰 Bill modal shown');
-      }
-    }, 500);
-    
-    // Clear all ride data after showing bill
-    const clearRideData = () => {
-      if (!isMountedRef.current) return;
-      
-      console.log('🧹 Clearing all ride data');
-      
-      // Clear all state
-      setRouteCoords([]);
-      setDriverLocation(null);
-      setDisplayedDriverLocation(null);
-      setPickupLocation(null);
-      setDropoffLocation(null);
-      setBookedPickupLocation(null);
-      setDistance('');
-      setTravelTime('');
-      setEstimatedPrice(null);
-      setAcceptedDriver(null);
-      setDriverId(null);
-      setDriverName(null);
-      setDriverMobile(null);
-      setTravelledKm(0);
-      setLastCoord(null);
-      setNearbyDrivers([]);
-      setNearbyDriversCount(0);
-      setApiError(null);
-      setLastPolylineUpdateLocation(null);
-      setSmoothRouteCoords([]);
-      
-      // Reset input fields
-      propHandlePickupChange('');
-      propHandleDropoffChange('');
-      
-      // Reset UI
-      setShowPickupSuggestions(false);
-      setShowDropoffSuggestions(false);
-      setShowSearchingPopup(false);
-      setHasClosedSearching(false);
-      
-      // Force map refresh
-      setTimeout(() => {
-        if (isMountedRef.current) {
-          setMapKey(prevKey => prevKey + 1);
-          console.log('🗺️ Map refreshed');
-        }
-      }, 100);
-      
-      // Clear AsyncStorage
-      AsyncStorage.multiRemove([
-        'currentRideId',
-        'acceptedDriver',
-        'rideStatus',
-        'bookingOTP',
-        'driverLocation',
-        'driverLocationTimestamp',
-        'ridePickupLocation',
-        'bookedPickupLocation',
-        'rideDropoffLocation',
-        'rideRouteCoords',
-        'rideDistance',
-        'rideTravelTime'
-      ]).then(() => {
-        console.log('✅ AsyncStorage cleared');
-      });
-    };
-    
-    // Clear after showing bill for 5 seconds
-    setTimeout(clearRideData, 5000);
-    
-    console.log('✅ Ride completion handled successfully');
-    
-  } catch (error) {
-    console.error('❌ Error in handleRideCompleted:', error);
-    
-    // Emergency reset on error
-    Alert.alert(
-      "Ride Completed",
-      "Your ride has been completed. You can now book a new ride.",
-      [{ text: "OK", onPress: resetToHomeScreen }]
-    );
-  }
-}, []); // Empty deps because we use refs
-
+  // Close modal first
+  setShowBillModal(false);
+  
+  // Clear all ride state
+  setCurrentRideId(null);
+  setRideStatus("idle");
+  setRealTimeNavigationActive(false);
+  setShowLocationOverlay(true);
+  setFollowDriver(false);
+  setAcceptedDriver(null);
+  setDriverLocation(null);
+  setDisplayedDriverLocation(null);
+  setRouteCoords([]);
+  setTravelledKm(0);
+  setDistance('');
+  setTravelTime('');
+  setEstimatedPrice(null);
+  setBookingOTP('');
+  setShowOTPInput(false);
+  setHidePickupAndUserLocation(false);
+  setOtpVerifiedAlertShown(false);
+  
+  // Reset input fields
+  propHandlePickupChange('');
+  propHandleDropoffChange('');
+  
+  // Clear driver markers
+  setNearbyDrivers([]);
+  setNearbyDriversCount(0);
+  
+  // Clear route data
+  setLastPolylineUpdateLocation(null);
+  setSmoothRouteCoords([]);
+  
+  // Reset search UI
+  setShowSearchingPopup(false);
+  setHasClosedSearching(false);
+  
+  // Reset suggestions
+  setPickupSuggestions([]);
+  setDropoffSuggestions([]);
+  setShowPickupSuggestions(false);
+  setShowDropoffSuggestions(false);
+  
+  // Force map refresh
+  setMapKey(prev => prev + 1);
+  
+  // Clear AsyncStorage for ride data
+  await AsyncStorage.multiRemove([
+    'currentRideId',
+    'acceptedDriver',
+    'rideStatus',
+    'bookingOTP',
+    'driverLocation',
+    'ridePickupLocation',
+    'bookedPickupLocation',
+    'rideDropoffLocation',
+    'rideRouteCoords',
+    'rideDistance',
+    'rideTravelTime',
+    'rideSelectedType',
+    "rideWantReturn",
+    'rideEstimatedPrice',
+    'lastRideId'
+  ]);
+  
+  console.log('✅ User app completely reset to home screen');
+};
 
 
 // Set up the event listener
@@ -1020,16 +943,16 @@ useEffect(() => {
 
   console.log("🔌 Setting up ride completion event listeners");
 
-  socket.on("rideCompleted", handleRideCompleted);
-  socket.on("rideCompletionConfirmed", handleRideCompleted);
-  socket.on("rideCompletedGlobal", handleRideCompleted);
+  socket.on("rideCompleted", );
+  socket.on("rideCompletionConfirmed", );
+  socket.on("rideCompletedGlobal", );
   
   return () => {
-    socket.off("rideCompleted", handleRideCompleted);
-    socket.off("rideCompletionConfirmed", handleRideCompleted);
-    socket.off("rideCompletedGlobal", handleRideCompleted);
+    socket.off("rideCompleted", );
+    socket.off("rideCompletionConfirmed", );
+    socket.off("rideCompletedGlobal", );
   };
-}, [handleRideCompleted]); // Stable because of useCallback with empty deps
+}, []); // Stable because of useCallback with empty deps
 
 
 
@@ -1537,18 +1460,36 @@ const handleOtpVerification = (data: any) => {
 
 
 
-
+// Replace your existing handleRideCompletion with this:
 const handleRideCompletion = useCallback(async (data: any) => {
+  console.log("🎉 HANDLE RIDE COMPLETION TRIGGERED");
+  console.log("📦 Completion data:", data);
+
   try {
-    console.log("🎉 HANDLE RIDE COMPLETION TRIGGERED");
-    console.log("📦 Completion data:", data);
+    if (!isMountedRef.current) return;
     
-    if (data.rideId !== currentRideId) {
-      console.log(`⚠️ Ride ID mismatch: ${data.rideId} vs ${currentRideId}`);
+    // Validate data
+    if (!data || !data.rideId) {
+      console.error('❌ Invalid ride completion data');
       return;
     }
     
-    // Update state first
+    console.log('📊 Ride completion data:', {
+      rideId: data.rideId,
+      distance: data.distance,
+      charge: data.charge,
+      currentRideId: currentRideIdRef.current
+    });
+    
+    // Check if this is our current ride
+    if (data.rideId !== currentRideIdRef.current) {
+      console.log(`⚠️ Ignoring ride completion for different ride: ${data.rideId} vs ${currentRideIdRef.current}`);
+      return;
+    }
+    
+    console.log(`🔄 Updating state to completed for ride: ${data.rideId}`);
+    
+    // Update state immediately
     setRideStatus("completed");
     setRealTimeNavigationActive(false);
     setShowOTPInput(false);
@@ -1556,94 +1497,45 @@ const handleRideCompletion = useCallback(async (data: any) => {
     setOtpVerifiedAlertShown(false);
     setFollowDriver(false);
     
-    // Calculate final charge
-    const finalDistance = data?.distance || travelledKm || 0;
+    // Calculate final bill
+    const finalDistance = data?.distance ? parseFloat(data.distance) : travelledKmRef.current || 0;
     const finalTime = data?.travelTime || travelTime || "0 min";
     let finalCharge = data?.charge || 0;
     
+    // If no charge provided, calculate it
     if (finalCharge === 0 && finalDistance > 0) {
-      finalCharge = finalDistance * (dynamicPrices[selectedRideType] || 0);
+      finalCharge = finalDistance * (dynamicPrices[selectedRideTypeRef.current] || 0);
     }
     
-    console.log(`💰 Final bill: ${finalDistance}km × ₹${dynamicPrices[selectedRideType]}/km = ₹${finalCharge}`);
+    console.log(`💰 Final bill: ${finalDistance}km × ₹${dynamicPrices[selectedRideTypeRef.current]}/km = ₹${finalCharge}`);
     
     // Set bill details
-    setBillDetails({
-      distance: `${parseFloat(finalDistance).toFixed(2)} km`,
+    const newBillDetails = {
+      distance: `${finalDistance.toFixed(2)} km`,
       travelTime: finalTime,
       charge: finalCharge,
-      driverName: data?.driverName || acceptedDriver?.name || "Driver",
-      vehicleType: data?.vehicleType || acceptedDriver?.vehicleType || selectedRideType,
-    });
+      userName: data?.driverName || acceptedDriverRef.current?.name || 'Driver',
+      userMobile: data?.userMobile || acceptedDriverRef.current?.mobile || 'N/A',
+      baseFare: 0,
+      timeCharge: 0,
+      tax: 0
+    };
     
-    // Show bill modal immediately
+    setBillDetails(newBillDetails);
+    
+    // ✅ CRITICAL FIX: SHOW BILL MODAL ONLY. DO NOT RESET APP YET.
     setShowBillModal(true);
-    console.log('💰 Bill modal shown immediately');
-    
-    // Clear all visual ride data
-    console.log('🧹 Clearing all visual ride data');
-    setRouteCoords([]);
-    setDriverLocation(null);
-    setDisplayedDriverLocation(null);
-    setPickupLocation(null);
-    setDropoffLocation(null);
-    setBookedPickupLocation(null);
-    setDistance('');
-    setTravelTime('');
-    setEstimatedPrice(null);
-    setAcceptedDriver(null);
-    setDriverId(null);
-    setDriverName(null);
-    setDriverMobile(null);
-    setTravelledKm(0);
-    setLastCoord(null);
-    setNearbyDrivers([]);
-    setNearbyDriversCount(0);
-    setApiError(null);
-    setLastPolylineUpdateLocation(null);
-    setSmoothRouteCoords([]);
-    
-    // Reset UI state
-    propHandlePickupChange('');
-    propHandleDropoffChange('');
-    setShowPickupSuggestions(false);
-    setShowDropoffSuggestions(false);
-    setShowSearchingPopup(false);
-    setHasClosedSearching(false);
-    
-    // Force map remount to clear all markers and routes
-    setMapKey(prevKey => prevKey + 1);
-    console.log('🗺️ Map remounted to clear visual elements');
-    
-    // Clear AsyncStorage for ride data
-    await AsyncStorage.multiRemove([
-      'currentRideId',
-      'acceptedDriver',
-      'rideStatus',
-      'bookingOTP',
-      'driverLocation',
-      'driverLocationTimestamp',
-      'ridePickupLocation',
-      'bookedPickupLocation',
-      'rideDropoffLocation',
-      'rideRouteCoords',
-      'rideDistance',
-      'rideTravelTime'
-    ]);
-    
-    console.log('✅ Ride completion handled successfully');
+    console.log('💰 Bill modal triggered');
     
   } catch (error) {
     console.error('❌ Error in handleRideCompletion:', error);
-    // Even if there's an error, at least reset the state
     Alert.alert(
       "Ride Completed",
-      "Your ride has been completed. Please book a new ride.",
+      "Your ride has been completed. You can now book a new ride.",
       [{ text: "OK", onPress: () => resetToHomeScreen() }]
     );
   }
-}, [currentRideId, travelledKm, travelTime, acceptedDriver, selectedRideType, dynamicPrices]);
-
+}, []); // Empty deps
 
 
 const resetToHomeScreen = useCallback(async () => {
@@ -1806,143 +1698,158 @@ const resetToHomeScreen = useCallback(async () => {
   
 
 
- 
-  const processRideAcceptance = useCallback((data: any) => {
-  if (!isMountedRef.current) return;
 
-  console.log('🎯 PROCESSING RIDE ACCEPTANCE:', data?.rideId, data?.driverId);
-  console.log('📍 Driver location from server:', {
-    driverCurrentLocation: data?.driverCurrentLocation,
-    driverLat: data?.driverLat,
-    driverLng: data?.driverLng,
-    locationType: data?.locationType
-  });
+    // In TaxiContent.tsx - Replace the existing processRideAcceptance function with this:
 
-  // Clear any existing polling interval
-  AsyncStorage.getItem('statusPollInterval').then(id => {
-    if (id) {
-      clearInterval(parseInt(id, 10));
-      AsyncStorage.removeItem('statusPollInterval');
+  const processRideAcceptance = useCallback(async (data: any) => {
+    console.log('🚨 ===== RIDE ACCEPTANCE DETECTED =====');
+    console.log('📦 Full Data:', data);
+
+    if (!isMountedRef.current) return;
+
+    // ✅ CRITICAL FIX: Handle Race Condition
+    // If we are currently searching, we should accept the incoming ride ID
+    // even if the local 'currentRideId' state hasn't updated yet.
+    const isSearchingForRide = rideStatus === 'searching';
+    
+    // Only block if we are NOT searching AND the IDs don't match
+    if (!isSearchingForRide && data.rideId !== currentRideId) {
+      console.log('⚠️ Blocking ride acceptance: Ride IDs differ', data.rideId, 'vs', currentRideId);
+      return;
     }
-  });
 
-  // Set basic ride/driver state
-  setRideStatus('onTheWay');
-  setDriverId(data.driverId);
-  setDriverName(data.driverName || 'Driver');
-  setDriverMobile(data.driverMobile || 'N/A');
-  setCurrentRideId(data.rideId);
-
-  // ✅ CRITICAL FIX: Use driver's ACTUAL location from server, NOT pickup location
-  let driverLocationCandidate = null;
-  
-  if (data?.driverCurrentLocation) {
-    // Use driver's actual current location from server
-    driverLocationCandidate = {
-      latitude: data.driverCurrentLocation.latitude || 0,
-      longitude: data.driverCurrentLocation.longitude || 0,
-      source: 'server_driver_current_location'
-    };
-    console.log('📍 Using driver CURRENT location from server');
-  } else if (data?.driverLat && data?.driverLng) {
-    driverLocationCandidate = {
-      latitude: data.driverLat,
-      longitude: data.driverLng,
-      source: 'server_driver_lat_lng'
-    };
-    console.log('📍 Using driver lat/lng from server');
-  } else if (data?.currentDriverLocation) {
-    driverLocationCandidate = {
-      latitude: data.currentDriverLocation.latitude || data.currentDriverLocation.lat || 0,
-      longitude: data.currentDriverLocation.longitude || data.currentDriverLocation.lng || 0,
-      source: 'server_current_driver_location'
-    };
-    console.log('📍 Using currentDriverLocation from server');
-  } else {
-    // Fallback: Use driver's own current location (NOT pickup)
-    console.log('⚠️ No driver location from server, using current location');
-    if (location) {
-      driverLocationCandidate = {
-        latitude: location.latitude,
-        longitude: location.longitude,
-        source: 'driver_current_gps'
-      };
+    // If we are searching and don't have a currentRideId yet, update it from the event
+    if (isSearchingForRide && !currentRideId) {
+      console.log('🔄 Updating currentRideId from socket event (Race Condition Fix)');
+      setCurrentRideId(data.rideId);
     }
-  }
 
-  // Prepare acceptedDriver object with ACTUAL location
-  const acceptedDriverData: DriverType = {
-    driverId: data.driverId,
-    name: data.driverName || 'Driver',
-    driverMobile: data.driverMobile || 'N/A',
-    location: {
-      coordinates: driverLocationCandidate
-        ? [driverLocationCandidate.longitude, driverLocationCandidate.latitude]
-        : [0, 0]
-    },
-    vehicleType: data.vehicleType || selectedRideType,
-    status: 'onTheWay'
-  };
-
-  console.log('👨‍💼 Setting accepted driver with ACTUAL location:', acceptedDriverData);
-
-  setAcceptedDriver(acceptedDriverData);
-
-  // CRITICAL: Clear nearby drivers to prevent unwanted markers during active ride
-  setNearbyDrivers([]);
-  setNearbyDriversCount(0);
-
-  // Set driver location into states
-  if (driverLocationCandidate) {
-    const driverLoc = {
-      latitude: driverLocationCandidate.latitude,
-      longitude: driverLocationCandidate.longitude
-    };
-
-    console.log('📍 DRIVER ACTUAL LOCATION SET:', driverLoc);
-
-    setDriverLocation(driverLoc);
-    setDisplayedDriverLocation(driverLoc);
-
-    // Save to AsyncStorage
-    AsyncStorage.setItem('driverLocation', JSON.stringify(driverLoc));
-
-    // Immediately request live location updates
-    setTimeout(() => {
-      if (socket) {
-        socket.emit('requestDriverLocation', {
-          rideId: data.rideId,
-          driverId: data.driverId,
-          priority: 'high'
-        });
-        console.log('📡 Requested immediate driver location update');
+    // Stop searching UI immediately
+    setShowSearchingPopup(false);
+    setHasClosedSearching(true);
+    
+    // Stop polling
+    AsyncStorage.getItem('statusPollInterval').then(id => {
+      if (id) {
+        clearInterval(parseInt(id, 10));
+        AsyncStorage.removeItem('statusPollInterval');
       }
-    }, 500);
-  }
+    });
 
-  // Save ride data
-  AsyncStorage.multiSet([
-    ['currentRideId', data.rideId],
-    ['acceptedDriver', JSON.stringify(acceptedDriverData)],
-    ['rideStatus', 'onTheWay']
-  ]);
+    // Set basic ride/driver state
+    setRideStatus('onTheWay');
+    setDriverId(data.driverId);
+    setDriverName(data.driverName || 'Driver');
+    setDriverMobile(data.driverMobile || 'N/A');
+    setCurrentRideId(data.rideId);
 
-  console.log('✅ Ride acceptance processed with ACTUAL driver location');
+    // ✅ CRITICAL FIX: Use driver's ACTUAL location from server, NOT pickup location
+    let driverLocationCandidate = null;
+    
+    if (data?.driverCurrentLocation) {
+      // Use driver's actual current location from server
+      driverLocationCandidate = {
+        latitude: data.driverCurrentLocation.latitude || 0,
+        longitude: data.driverCurrentLocation.longitude || 0,
+        source: 'server_driver_current_location'
+      };
+      console.log('📍 Using driver CURRENT location from server');
+    } else if (data?.driverLat && data?.driverLng) {
+      driverLocationCandidate = {
+        latitude: data.driverLat,
+        longitude: data.driverLng,
+        source: 'server_driver_lat_lng'
+      };
+      console.log('📍 Using driver lat/lng from server');
+    } else if (data?.currentDriverLocation) {
+      driverLocationCandidate = {
+        latitude: data.currentDriverLocation.latitude || data.currentDriverLocation.lat || 0,
+        longitude: data.currentDriverLocation.longitude || data.currentDriverLocation.lng || 0,
+        source: 'server_current_driver_location'
+      };
+      console.log('📍 Using currentDriverLocation from server');
+    } else {
+      // Fallback: Use driver's own current location (NOT pickup)
+      console.log('⚠️ No driver location from server, using current location');
+      if (location) {
+        driverLocationCandidate = {
+          latitude: location.latitude,
+          longitude: location.longitude,
+          source: 'driver_current_gps'
+        };
+      }
+    }
 
-  // Update UI
-  setShowSearchingPopup(false);
-  setShowOTPInput(true);
-  setFollowDriver(true);
+    // Prepare acceptedDriver object with ACTUAL location
+    const acceptedDriverData: DriverType = {
+      driverId: data.driverId,
+      name: data.driverName || 'Driver',
+      driverMobile: data.driverMobile || 'N/A',
+      location: {
+        coordinates: driverLocationCandidate
+          ? [driverLocationCandidate.longitude, driverLocationCandidate.latitude]
+          : [0, 0]
+      },
+      vehicleType: data.vehicleType || selectedRideType,
+      status: 'onTheWay'
+    };
 
-  // Fit map to show driver's actual location and pickup
-  setTimeout(() => {
-    fitMapToMarkers();
-  }, 100);
+    console.log('👨‍💼 Setting accepted driver with ACTUAL location:', acceptedDriverData);
 
-}, [selectedRideType, location, socket]);
+    setAcceptedDriver(acceptedDriverData);
 
+    // CRITICAL: Clear nearby drivers to prevent unwanted markers during active ride
+    setNearbyDrivers([]);
+    setNearbyDriversCount(0);
 
+    // Set driver location into states
+    if (driverLocationCandidate) {
+      const driverLoc = {
+        latitude: driverLocationCandidate.latitude,
+        longitude: driverLocationCandidate.longitude
+      };
 
+      console.log('📍 DRIVER ACTUAL LOCATION SET:', driverLoc);
+
+      setDriverLocation(driverLoc);
+      setDisplayedDriverLocation(driverLoc);
+
+      // Save to AsyncStorage
+      AsyncStorage.setItem('driverLocation', JSON.stringify(driverLoc));
+
+      // Immediately request live location updates
+      setTimeout(() => {
+        if (socket) {
+          socket.emit('requestDriverLocation', {
+            rideId: data.rideId,
+            driverId: data.driverId,
+            priority: 'high'
+          });
+          console.log('📡 Requested immediate driver location update');
+        }
+      }, 500);
+    }
+
+    // Save ride data
+    AsyncStorage.multiSet([
+      ['currentRideId', data.rideId],
+      ['acceptedDriver', JSON.stringify(acceptedDriverData)],
+      ['rideStatus', 'onTheWay']
+    ]);
+
+    console.log('✅ Ride acceptance processed with ACTUAL driver location');
+
+    // Update UI
+    setShowSearchingPopup(false);
+    setShowOTPInput(true);
+    setFollowDriver(true);
+
+    // Fit map to show driver's actual location and pickup
+    setTimeout(() => {
+      fitMapToMarkers();
+    }, 100);
+
+}, [selectedRideType, location, socket, currentRideId, rideStatus]);
 
   // Recover ride data on component mount
   useEffect(() => {
@@ -2245,15 +2152,15 @@ useEffect(() => {
   socket.on("otpVerified", handleOtpVerified);
   socket.on("rideStatusUpdate", handleRideStatusUpdate);
   socket.on("driverStartedRide", handleDriverStartedRide);
-  socket.on("rideCompleted", handleRideCompleted);
-  socket.on("rideCompletedGlobal", handleRideCompleted); // Also listen for global event
+  socket.on("rideCompleted", );
+  socket.on("rideCompletedGlobal", ); // Also listen for global event
   
   return () => {
     socket.off("otpVerified", handleOtpVerified);
     socket.off("rideStatusUpdate", handleRideStatusUpdate);
     socket.off("driverStartedRide", handleDriverStartedRide);
-    socket.off("rideCompleted", handleRideCompleted);
-    socket.off("rideCompletedGlobal", handleRideCompleted);
+    socket.off("rideCompleted", );
+    socket.off("rideCompletedGlobal", );
   };
 }, [currentRideId, acceptedDriver, travelledKm, travelTime, selectedRideType, dynamicPrices]);
 
@@ -3420,6 +3327,48 @@ const isValidLatLng = (lat: number | undefined, lng: number | undefined): boolea
     fetchUserData();
   }, []);
   
+
+
+  // Add this near other socket handlers
+const setupSocketDebugging = () => {
+  console.log('🔧 Setting up socket debugging for ride acceptance');
+  
+  // Debug all ride-related events
+  socket.onAny((eventName, ...args) => {
+    if (eventName.includes('ride') || eventName.includes('Room')) {
+      console.log(`🔍 [ALL EVENTS] ${eventName}:`, args[0]);
+    }
+  });
+  
+  // Specific handler for rideAccepted
+  socket.on("rideAccepted", (data) => {
+    console.log('🚨🚨🚨 RIDE ACCEPTED EVENT RECEIVED 🚨🚨🚨');
+    console.log('📦 Full data:', JSON.stringify(data, null, 2));
+    console.log('🔍 Validating data:', {
+      hasRideId: !!data.rideId,
+      hasDriverId: !!data.driverId,
+      hasDriverLocation: !!(data.driverLat || data.driverLng || data.driverCurrentLocation),
+      dataKeys: Object.keys(data)
+    });
+    
+    processRideAcceptance(data);
+  });
+  
+  // Handle global broadcasts
+  socket.on("rideAcceptedGlobal", (data) => {
+    console.log('🌍 GLOBAL ride acceptance received:', data);
+    // Check if this is for our user
+    AsyncStorage.getItem('userId').then(userId => {
+      if (data.targetUserId === userId) {
+        console.log('✅ This global broadcast is for us!');
+        processRideAcceptance(data);
+      }
+    });
+  });
+};
+
+
+
   // Handle ride created
   useEffect(() => {
     if (!isMountedRef.current) return;
@@ -3677,86 +3626,6 @@ const isValidLatLng = (lat: number | undefined, lng: number | undefined): boolea
   
 
 
-  const handleBillModalClose = async () => {
-  console.log('💰 Closing bill modal and completely resetting app');
-  
-  // Close modal first
-  setShowBillModal(false);
-  
-  // Clear all ride state
-  setCurrentRideId(null);
-  setRideStatus("idle");
-  setRealTimeNavigationActive(false);
-  setShowLocationOverlay(true);
-  setFollowDriver(false);
-  setAcceptedDriver(null);
-  setDriverLocation(null);
-  setDisplayedDriverLocation(null);
-  setRouteCoords([]);
-  setTravelledKm(0);
-  setDistance('');
-  setTravelTime('');
-  setEstimatedPrice(null);
-  setBookingOTP('');
-  setShowOTPInput(false);
-  setHidePickupAndUserLocation(false);
-  setOtpVerifiedAlertShown(false);
-  
-  // Reset input fields
-  propHandlePickupChange('');
-  propHandleDropoffChange('');
-  
-  // Clear driver markers
-  setNearbyDrivers([]);
-  setNearbyDriversCount(0);
-  
-  // Clear route data
-  setLastPolylineUpdateLocation(null);
-  setSmoothRouteCoords([]);
-  
-  // Reset search UI
-  setShowSearchingPopup(false);
-  setHasClosedSearching(false);
-  
-  // Reset suggestions
-  setPickupSuggestions([]);
-  setDropoffSuggestions([]);
-  setShowPickupSuggestions(false);
-  setShowDropoffSuggestions(false);
-  
-  // Force map refresh
-  setMapKey(prev => prev + 1);
-  
-  // Clear AsyncStorage for ride data
-  await AsyncStorage.multiRemove([
-    'currentRideId',
-    'acceptedDriver',
-    'rideStatus',
-    'bookingOTP',
-    'driverLocation',
-    'ridePickupLocation',
-    'bookedPickupLocation',
-    'rideDropoffLocation',
-    'rideRouteCoords',
-    'rideDistance',
-    'rideTravelTime',
-    'rideSelectedType',
-    'rideWantReturn',
-    'rideEstimatedPrice',
-    'lastRideId'
-  ]);
-  
-  // Fetch fresh nearby drivers
-  if (location) {
-    setTimeout(() => {
-      fetchNearbyDrivers(location.latitude, location.longitude);
-    }, 1000);
-  }
-  
-  console.log('✅ User app completely reset to home screen');
-};
-
-
 
   // Add this useEffect to handle ALL completion events
 useEffect(() => {
@@ -3798,7 +3667,7 @@ useEffect(() => {
     socket.off("rideCompletionConfirmed", handleAllCompletions);
     socket.off("rideCompletedGlobal", handleAllCompletions);
   };
-}, [socket, handleRideCompleted]); // Add handleRideCompleted to deps
+}, [socket]); // Add handleRideCompleted to deps
 
 
   // Debug monitoring for animation state

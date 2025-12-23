@@ -1,14 +1,30 @@
-// Change from ngrok to your server IP
-export const API_BASE_URL = "https://5207a262405d.ngrok-free.app";
+// /Users/webasebrandings/Downloads/old codes/userapp-eazygo-Public-main/src/util/backendConfig.tsx
+
+import { Platform } from "react-native";
+
+// -----------------------------------------
+// ✅ LOCALHOST CONFIGURATION
+// -----------------------------------------
+
+// Android Emulator uses 10.0.2.2 to access the computer's localhost
+// iOS Simulator uses localhost
+const LOCAL_IP = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
+const PORT = '5001';
+
+// Base URL for API calls
+export const API_BASE_URL = `http://${LOCAL_IP}:${PORT}`;
+
+console.log("🚀 User App API configured for LOCALHOST:", API_BASE_URL);
 
 // Add this function to get your server URL for map tiles
 export const getMapTileUrl = () => {
-  return "https://5207a262405d.ngrok-free.app/data/v3";
+  return `${API_BASE_URL}/data/v3`;
 };
+
 // ----------- MAIN URL FUNCTIONS -------------- //
 
 export const getBackendUrl = (): string => {
-  return API_BASE_URL; // Always use production URL
+  return API_BASE_URL; // Always use local URL
 };
 
 export const getSocketUrl = (): string => {
@@ -24,9 +40,9 @@ export const getImageUrl = (imagePath: string): string => {
 
   // If it's already a complete URL
   if (imagePath.startsWith("http")) {
-    // Replace any localhost/127.0.0.1 with production backend URL
-    if (imagePath.includes('localhost') || imagePath.includes('127.0.0.1')) {
-      return imagePath.replace(/http:\/\/[^/]+/, backendUrl);
+    // Replace any production URL with local URL if needed (optional)
+    if (imagePath.includes('ba-lhhs.onrender.com')) {
+      return imagePath.replace('https://ba-lhhs.onrender.com', backendUrl);
     }
     return imagePath;
   }
@@ -53,9 +69,7 @@ export const getProductImageUrl = (imagePath: string): string => {
 
 export const API_CONFIG = {
   BASE_URL: getBackendUrl(),
-
   getImageUrl: (path: string) => getImageUrl(path),
-  
   getProductImageUrl: (path: string) => getProductImageUrl(path),
 };
 
@@ -69,6 +83,80 @@ export default {
   API_CONFIG,
   API_BASE_URL,
 };
+
+
+
+// // Change from ngrok to your server IP
+// export const API_BASE_URL = "https://ba-lhhs.onrender.com";
+
+// // Add this function to get your server URL for map tiles
+// export const getMapTileUrl = () => {
+//   return "https://ba-lhhs.onrender.com/data/v3";
+// };
+// // ----------- MAIN URL FUNCTIONS -------------- //
+
+// export const getBackendUrl = (): string => {
+//   return API_BASE_URL; // Always use production URL
+// };
+
+// export const getSocketUrl = (): string => {
+//   return getBackendUrl();
+// };
+
+// // ----------- IMAGE URL HANDLERS -------------- ///
+// // Main image URL handler
+// export const getImageUrl = (imagePath: string): string => {
+//   if (!imagePath) return "";
+
+//   const backendUrl = getBackendUrl();
+
+//   // If it's already a complete URL
+//   if (imagePath.startsWith("http")) {
+//     // Replace any localhost/127.0.0.1 with production backend URL
+//     if (imagePath.includes('localhost') || imagePath.includes('127.0.0.1')) {
+//       return imagePath.replace(/http:\/\/[^/]+/, backendUrl);
+//     }
+//     return imagePath;
+//   }
+
+//   // Handle different path formats
+//   if (imagePath.startsWith("/uploads/")) {
+//     return `${backendUrl}${imagePath}`;
+//   }
+
+//   if (imagePath.startsWith("uploads/")) {
+//     return `${backendUrl}/${imagePath}`;
+//   }
+
+//   // Default case
+//   return `${backendUrl}/uploads/${imagePath}`;
+// };
+
+// // Add this missing function that your components need
+// export const getProductImageUrl = (imagePath: string): string => {
+//   return getImageUrl(imagePath);
+// };
+
+// // ----------- ENV BASED API CONFIG -------------- //
+
+// export const API_CONFIG = {
+//   BASE_URL: getBackendUrl(),
+
+//   getImageUrl: (path: string) => getImageUrl(path),
+  
+//   getProductImageUrl: (path: string) => getProductImageUrl(path),
+// };
+
+// // ----------- DEFAULT EXPORT -------------- //
+
+// export default {
+//   getBackendUrl,
+//   getSocketUrl,
+//   getImageUrl,
+//   getProductImageUrl,
+//   API_CONFIG,
+//   API_BASE_URL,
+// };
 
 
 
