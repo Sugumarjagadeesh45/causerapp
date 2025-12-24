@@ -1,20 +1,16 @@
 // /Users/webasebrandings/Downloads/old codes/userapp-eazygo-Public-main/src/util/backendConfig.tsx
 
-import { Platform } from "react-native";
-
 // -----------------------------------------
-// ✅ LOCALHOST CONFIGURATION
+// 🌍 LIVE SERVER CONFIGURATION
 // -----------------------------------------
 
-// Android Emulator uses 10.0.2.2 to access the computer's localhost
-// iOS Simulator uses localhost
-const LOCAL_IP = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-const PORT = '5001';
+const LOCAL_IP = 'taxi.webase.co.in'; // Kept for reference, but main URL is direct below
+const PORT = '443'; // HTTPS default
 
 // Base URL for API calls
-export const API_BASE_URL = `http://${LOCAL_IP}:${PORT}`;
+export const API_BASE_URL = `https://taxi.webase.co.in`;
 
-console.log("🚀 User App API configured for LOCALHOST:", API_BASE_URL);
+console.log("🚀 User App API configured for LIVE SERVER:", API_BASE_URL);
 
 // Add this function to get your server URL for map tiles
 export const getMapTileUrl = () => {
@@ -24,7 +20,7 @@ export const getMapTileUrl = () => {
 // ----------- MAIN URL FUNCTIONS -------------- //
 
 export const getBackendUrl = (): string => {
-  return API_BASE_URL; // Always use local URL
+  return API_BASE_URL; 
 };
 
 export const getSocketUrl = (): string => {
@@ -40,10 +36,6 @@ export const getImageUrl = (imagePath: string): string => {
 
   // If it's already a complete URL
   if (imagePath.startsWith("http")) {
-    // Replace any production URL with local URL if needed (optional)
-    if (imagePath.includes('ba-lhhs.onrender.com')) {
-      return imagePath.replace('https://ba-lhhs.onrender.com', backendUrl);
-    }
     return imagePath;
   }
 
@@ -86,17 +78,27 @@ export default {
 
 
 
-// // Change from ngrok to your server IP
-// export const API_BASE_URL = "https://ba-lhhs.onrender.com";
+
+
+// import { Platform } from "react-native";
+
+// const LOCAL_IP = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
+// const PORT = '5001';
+
+// // Base URL for API calls
+// export const API_BASE_URL = `http://${LOCAL_IP}:${PORT}`;
+
+// console.log("🚀 User App API configured for LOCALHOST:", API_BASE_URL);
 
 // // Add this function to get your server URL for map tiles
 // export const getMapTileUrl = () => {
-//   return "https://ba-lhhs.onrender.com/data/v3";
+//   return `${API_BASE_URL}/data/v3`;
 // };
+
 // // ----------- MAIN URL FUNCTIONS -------------- //
 
 // export const getBackendUrl = (): string => {
-//   return API_BASE_URL; // Always use production URL
+//   return API_BASE_URL; // Always use local URL
 // };
 
 // export const getSocketUrl = (): string => {
@@ -112,9 +114,9 @@ export default {
 
 //   // If it's already a complete URL
 //   if (imagePath.startsWith("http")) {
-//     // Replace any localhost/127.0.0.1 with production backend URL
-//     if (imagePath.includes('localhost') || imagePath.includes('127.0.0.1')) {
-//       return imagePath.replace(/http:\/\/[^/]+/, backendUrl);
+//     // Replace any production URL with local URL if needed (optional)
+//     if (imagePath.includes('ba-lhhs.onrender.com')) {
+//       return imagePath.replace('https://ba-lhhs.onrender.com', backendUrl);
 //     }
 //     return imagePath;
 //   }
@@ -141,9 +143,7 @@ export default {
 
 // export const API_CONFIG = {
 //   BASE_URL: getBackendUrl(),
-
 //   getImageUrl: (path: string) => getImageUrl(path),
-  
 //   getProductImageUrl: (path: string) => getProductImageUrl(path),
 // };
 
@@ -157,7 +157,3 @@ export default {
 //   API_CONFIG,
 //   API_BASE_URL,
 // };
-
-
-
-
