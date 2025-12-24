@@ -19,6 +19,7 @@ const socket = io(SOCKET_URL, {
   secure: true, // Important for HTTPS
 });
 
+
 socket.on('connect', () => {
   console.log('✅ SOCKET CONNECTED:', socket.id);
 });
