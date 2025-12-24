@@ -7197,6 +7197,7 @@ const handleRideAccepted = (data: any) => {
         otp = Date.now().toString().slice(-4);
       }
 
+      
       const rideData = {
         userId,
         customerId: customerId || userId,
