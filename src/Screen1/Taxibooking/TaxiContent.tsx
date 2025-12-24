@@ -8179,6 +8179,7 @@ const handleRideAccepted = (data: any) => {
 
   
 
+
 };
 
 const styles = StyleSheet.create({
