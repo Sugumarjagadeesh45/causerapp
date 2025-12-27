@@ -23,7 +23,7 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const LOCAL_IP = Platform.OS === 'android' ? '10.0.2.2' : '192.168.1.107';
 const LOCAL_PORT = '5001';
-const SERVER_URL = 'https://taxi.webase.co.in/';
+const SERVER_URL = 'https://taxi.webase.co.in';
 const LOCAL_URL = `http://${LOCAL_IP}:${LOCAL_PORT}/api/auth`;
 
 const callBackend = async (endpoint: string, data: any, timeout = 5000) => {
